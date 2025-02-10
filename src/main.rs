@@ -22,9 +22,6 @@ fn formula(coefficients: &HashMap<i32, f64>) -> String {
 
     for &exp in &exponents {
         let coeff = coefficients[exp];
-        if coeff == 0.0 {
-            continue;
-        }
 
         let sign = match coeff {
             c if c < 0.0 => "-",
@@ -47,19 +44,12 @@ fn formula(coefficients: &HashMap<i32, f64>) -> String {
 }
 
 fn degree(coefficients: &HashMap<i32, f64>) -> String {
-    let mut exponents: Vec<_> = coefficients.keys().collect();
-    exponents.sort_by(|a, b| b.cmp(a));
-
-    for &exp in &exponents {
-        let coeff = coefficients[exp];
-        if coeff == 0.0 {
-            continue;
-        }
-
-        return format!("{}", exp);
-    }
-
-    return format!("0");
+    coefficients
+        .iter()
+        .map(|(&k, _)| k)
+        .max()
+        .map(|d| d.to_string())
+        .unwrap_or_else(|| "0".to_string())
 }
 
 fn main() -> Result<(), String> {
@@ -137,8 +127,47 @@ fn main() -> Result<(), String> {
         *coefficients.entry(exp).or_insert(0.0) += value;
     }
 
+    coefficients.retain(|_, &mut v| v != 0.);
+
+    let d = degree(&coefficients);
+
     println!("Reduced form: {}", formula(&coefficients));
-    println!("Polynomial degree: {}", degree(&coefficients));
+    println!("Polynomial degree: {}", d);
+
+    match d.as_str() {
+        "0" => {
+            if let Some(&c) = coefficients.get(&0) {
+                println!("{}", if c.abs() == 0. { "Infinity possible solution" } else { "No solution" });
+            }
+        }
+        "1" => {
+            if let Some(&b) = coefficients.get(&1) {
+                let c = coefficients.get(&0).unwrap_or(&0.0);
+                let solution = -c / b;
+                println!("The solution is:\n{}", solution);
+            }
+        }
+        "2" => {
+            let a = coefficients.get(&2).unwrap_or(&0.0);
+            let b = coefficients.get(&1).unwrap_or(&0.0);
+            let c = coefficients.get(&0).unwrap_or(&0.0);
+
+            let discriminant = b * b - 4.0 * a * c;
+            if discriminant > 0.0 {
+                let root1 = (-b + discriminant.sqrt()) / (2.0 * a);
+                let root2 = (-b - discriminant.sqrt()) / (2.0 * a);
+                println!("The discriminant is stricly positive, the two solutions are:\n{}\n{}", root1, root2);
+            } else if discriminant.abs() < f64::EPSILON {
+                let root = -b / (2.0 * a);
+                println!("The solution is:\n{}", root);
+            } else {
+                let real_part = -b / (2.0 * a);
+                let imaginary_part = (discriminant.abs().sqrt()) / (2.0 * a);
+                println!("The discriminant is stricly negative, the two complex solutions are:\n{} + {}i\n{} - {}i", real_part, imaginary_part, real_part, imaginary_part);
+            }
+        }
+        _ => println!("The polynomial degree is stricly greater than 2, I can't solve.")
+    }
 
     return Ok(());
 }
